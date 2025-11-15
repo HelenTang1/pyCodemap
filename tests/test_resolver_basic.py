@@ -4,7 +4,7 @@ import textwrap
 from pycodemap import resolve_project, ResolverConfig
 
 
-def test_resolver_discovers_functions_and_methods(tmp_path: Path) -> None:
+def test_resolver_discovers_symbols_and_calls(tmp_path: Path) -> None:
     # Arrange: small fake project
     pkg = tmp_path / "pkg"
     pkg.mkdir()
@@ -27,14 +27,23 @@ def test_resolver_discovers_functions_and_methods(tmp_path: Path) -> None:
     # Act
     project = resolve_project(tmp_path, ResolverConfig())
 
-    # Assert
-    # We expect 1 function + 1 method + 1 class
+    # Assert symbols
     kinds = {s.kind for s in project.symbols.values()}
-    assert {"function", "method", "class"} <= kinds
+    # We should now have module + function + method + class symbols
+    assert {"module", "function", "method", "class"} <= kinds
 
     ids = sorted(project.symbols.keys())
     assert "pkg.a.f" in ids
     assert "pkg.a.C" in ids
-    assert any(id_.startswith("pkg.a.C.") for id_ in ids)  # method
+    assert any(id_.startswith("pkg.a.C.") for id_ in ids)  # method inside C
 
-    assert project.calls == []  # TODO: not implemented yet
+    # Assert calls
+    calls = project.calls
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.caller_id.endswith(".C.m")  # method C.m
+    assert call.raw_callee == "f"
+    assert call.callee_id == "pkg.a.f"
+    assert call.location.file == Path("pkg/a.py")
+    assert call.location.lineno > 0
