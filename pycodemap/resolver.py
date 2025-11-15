@@ -112,8 +112,6 @@ def resolve_project(root: Path, config: Optional[ResolverConfig] = None) -> Reso
     """
     Resolve a Python project into a `ResolvedProject`.
 
-    Week 2 implementation (two-pass):
-
     1. Walk the directory tree from ``root`` and find all ``.py`` files.
     2. First pass:
        - Parse every file into an AST.
