@@ -17,6 +17,8 @@ from .graph import (
     build_call_graph,
 )
 
+from .renderer import RendererConfig, build_dot, write_svg
+
 __all__ = [
     "SourceLocation",
     "SymbolKind",
@@ -30,6 +32,9 @@ __all__ = [
     "GraphEdge",
     "CallGraph",
     "build_call_graph",
+    "RendererConfig",
+    "build_dot",
+    "write_svg",
 ]
 
 __version__ = "0.1.0"
