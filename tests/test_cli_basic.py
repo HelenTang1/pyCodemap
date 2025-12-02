@@ -56,3 +56,22 @@ def test_cli_invalid_root_raises(tmp_path):
 
     with pytest.raises(ValueError):
         main([str(file_path), "--format", "summary"])
+
+def test_cli_dot_output(tmp_path: Path) -> None:
+    (tmp_path / "mod.py").write_text(
+        textwrap.dedent(
+            """
+            def hello():
+                return 42
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    output = tmp_path / "graph.dot"
+    exit_code = main([str(tmp_path), "--format", "dot", "-o", str(output)])
+    assert exit_code == 0
+    assert output.exists()
+    content = output.read_text(encoding="utf-8")
+    assert "digraph CallGraph" in content
+    assert "hello" in content
