@@ -52,10 +52,9 @@ def test_build_file_level_graph(tmp_path: Path) -> None:
     node_ids = set(graph.nodes.keys())
     assert "pkg.a" in node_ids
 
-    # Since both f and g live in the same module, file-level graph should
-    # aggregate to a self-loop edge pkg.a -> pkg.a.
+    # Self-loop edges are dropped; file-level aggregation should not emit pkg.a -> pkg.a
     edges = {(e.src, e.dst) for e in graph.iter_edges()}
-    assert ("pkg.a", "pkg.a") in edges
+    assert ("pkg.a", "pkg.a") not in edges
 
     node = graph.nodes["pkg.a"]
     assert node.kind == "file"

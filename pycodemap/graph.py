@@ -171,6 +171,10 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
         if caller_node_id is None or callee_node_id is None:
             continue
 
+        # Drop self-loops (caller and callee map to same node)
+        if caller_node_id == callee_node_id:
+            continue
+
         # Ensure nodes exist for any symbol that participated in a call but was
         # not part of the initial set (defensive; normally not needed).
         if caller_node_id not in nodes and caller_sym is not None:

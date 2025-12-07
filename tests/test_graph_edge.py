@@ -131,6 +131,27 @@ def test_prune_transitive_edges_removes_redundant_edge() -> None:
     assert ("b", "c") in remaining
 
 
+def test_self_loop_edges_are_removed(tmp_path: Path) -> None:
+    """Edges where caller and callee map to the same node are skipped."""
+
+    src = tmp_path / "loop.py"
+    src.write_text(
+        "def ping():\n"
+        "    ping()\n",
+        encoding="utf-8",
+    )
+
+    from pycodemap.resolver import resolve_project
+    from pycodemap.graph import GraphConfig, build_call_graph
+
+    project = resolve_project(src)
+    graph_cfg = GraphConfig(node_granularity="function", cluster_by_module=True)
+    cg = build_call_graph(project, graph_cfg)
+
+    # The call ping -> ping should have been dropped as a self-loop
+    assert len(cg.edges) == 0
+
+
 def test_edge_labels_include_line_numbers_when_enabled(tmp_path: Path) -> None:
     """
     When --show-line-numbers is enabled, edges should show

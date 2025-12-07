@@ -144,15 +144,16 @@ def _node_label(node: GraphNode, project: ResolvedProject, cfg: RendererConfig) 
     # Name / qualname label
     if sym is not None:
         if cfg.label_mode == "qualname":
-            base = sym.qualname
-        else:
-            base = sym.name
+            return sym.qualname
+        base = sym.name
     else:
         base = node.label
 
     extras: List[str] = []
-    if cfg.show_module and node.module:
-        extras.append(node.module)
+    if cfg.show_module and node.module and getattr(node, "kind", None) == "file":
+        # Avoid redundant module when it already equals the base or endswith base
+        if node.module != base and not node.module.endswith(f".{base}"):
+            extras.append(node.module)
     if cfg.show_line_numbers and sym is not None:
         extras.append(f"lines {sym.start_line}-{sym.end_line}")
 
