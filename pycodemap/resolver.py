@@ -138,7 +138,11 @@ def resolve_project(root: Path, config: Optional[ResolverConfig] = None) -> Reso
     if config is None:
         config = ResolverConfig()
 
-    if not root.is_dir():
+    if root.is_file():
+        if root.suffix != ".py":
+            raise ValueError(f"Project root is a file but not a .py file: {root}")
+
+    elif not root.is_dir():
         raise ValueError(f"Project root does not exist or is not a directory: {root}")
 
     # ------------------------------------------------------------------
@@ -148,7 +152,11 @@ def resolve_project(root: Path, config: Optional[ResolverConfig] = None) -> Reso
     file_infos: List[Tuple[Path, str, str, ast.AST]] = []  # (rel_path, module, source, tree)
 
     for path in _iter_python_files(root, config):
-        rel = path.relative_to(root)
+        # If root is a file, use the file's name as the relative path
+        if root.is_file():
+            rel = Path(path.name)
+        else:
+            rel = path.relative_to(root)
         module = _module_name_from_path(rel)
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(rel))
@@ -196,6 +204,9 @@ def os_walk(root: Path) -> Iterable[Tuple[str, List[str], List[str]]]:
 
 
 def _iter_python_files(root: Path, config: ResolverConfig) -> Iterable[Path]:
+    if root.is_file():
+        yield root
+        return
     for dirpath, dirnames, filenames in os_walk(root):
         # mutate dirnames in-place to respect exclude list
         dirnames[:] = [d for d in dirnames if d not in config.exclude]
@@ -217,7 +228,13 @@ def _module_name_from_path(rel_path: Path) -> str:
     >>> _module_name_from_path(Path("pkg/sub/mod.py"))
     'pkg.sub.mod'
     """
-    parts = list(rel_path.with_suffix("").parts)
+    path_without_suffix = rel_path.with_suffix("")
+    
+    # If path is just '.', return the original stem
+    if str(path_without_suffix) == '.':
+        return rel_path.stem
+    
+    parts = list(path_without_suffix.parts)
     return ".".join(parts)
 
 
