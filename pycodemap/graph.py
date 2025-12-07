@@ -118,7 +118,18 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
                 continue
             node_id = sym.id
             label = sym.name
-            cluster = sym.module if config.cluster_by_module else None
+            
+            # Cluster functions: if cluster_by_module is True, group methods by their
+            # containing class (parent qualname), or by module for top-level functions.
+            if config.cluster_by_module:
+                if sym.kind == "method" and "." in sym.qualname:
+                    # Extract the class qualname (everything before the last dot)
+                    cluster = sym.qualname.rsplit(".", 1)[0]
+                else:
+                    cluster = sym.module
+            else:
+                cluster = None
+            
             nodes[node_id] = GraphNode(
                 id=node_id,
                 label=label,
