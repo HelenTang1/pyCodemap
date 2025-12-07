@@ -39,15 +39,21 @@ class GraphEdge:
     """
     A directed edge in the call graph.
 
-    For now we only model "call" edges, with an aggregated count of call sites.
+    We aggregate multiple call sites between the same src/dst pair.  In addition to
+    `call_count`, we keep track of the line numbers where the calls occur so the
+    renderer can optionally show them when `--show-line-numbers` is enabled.
     """
 
     src: str
     dst: str
     call_count: int = 0
+    line_numbers: List[int] = None
 
-    def increment(self, n: int = 1) -> None:
-        self.call_count += n
+    def add_call(self, lineno: int) -> None:
+        if self.line_numbers is None:
+            self.line_numbers = []
+        self.call_count += 1
+        self.line_numbers.append(lineno)
 
 
 @dataclass
@@ -175,9 +181,9 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
         key = (caller_node_id, callee_node_id)
         edge = edges.get(key)
         if edge is None:
-            edge = GraphEdge(src=caller_node_id, dst=callee_node_id, call_count=0)
+            edge = GraphEdge(src=caller_node_id, dst=callee_node_id, call_count=0, line_numbers=[])
             edges[key] = edge
-        edge.increment(1)
+        edge.add_call(call.location.lineno)
 
     graph = CallGraph(nodes=nodes, edges=edges)
 

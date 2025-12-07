@@ -84,10 +84,20 @@ def build_dot(
     for edge in sorted(call_graph.iter_edges(), key=lambda e: (e.src, e.dst)):
         src = _sanitize_id(edge.src)
         dst = _sanitize_id(edge.dst)
-        if edge.call_count > 1:
-            lines.append(f'  "{src}" -> "{dst}" [label="{edge.call_count}"];')
+
+        if renderer_config.show_line_numbers:
+            nums = sorted(set(edge.line_numbers or []))
+            if nums:
+                num_list = ", ".join(str(n) for n in nums)
+                label = f"{edge.call_count}: [{num_list}]"
+            else:
+                label = str(edge.call_count)
+            lines.append(f'  "{src}" -> "{dst}" [label="{label}"];')
         else:
-            lines.append(f'  "{src}" -> "{dst}";')
+            if edge.call_count > 1:
+                lines.append(f'  "{src}" -> "{dst}" [label="{edge.call_count}"];')
+            else:
+                lines.append(f'  "{src}" -> "{dst}";')
 
     lines.append("}")
     return "\n".join(lines)
