@@ -129,3 +129,43 @@ def test_prune_transitive_edges_removes_redundant_edge() -> None:
     assert ("a", "c") not in remaining
     assert ("a", "b") in remaining
     assert ("b", "c") in remaining
+
+
+def test_edge_labels_include_line_numbers_when_enabled(tmp_path: Path) -> None:
+    """
+    When --show-line-numbers is enabled, edges should show
+    "<count>: [l1, l2, ...]" for the aggregated call sites.
+    """
+
+    src = tmp_path / "mod.py"
+    src.write_text(
+        "def foo():\n"
+        "    bar()\n"      # line 2
+        "    bar()\n"      # line 3
+        "\n"
+        "def bar():\n"
+        "    return 1\n"   # line 6
+        "\n"
+        "foo()\n",        # line 8 (module-level call, not part of foo->bar edge)
+        encoding="utf-8",
+    )
+
+    from pycodemap.resolver import resolve_project
+    from pycodemap.graph import GraphConfig
+    from pycodemap.renderer import RendererConfig, build_dot
+
+    project = resolve_project(src)
+
+    graph_cfg = GraphConfig(node_granularity="function", cluster_by_module=True)
+    renderer_cfg = RendererConfig(
+        label_mode="name",
+        show_module=False,
+        show_line_numbers=True,
+        max_snippet_lines=6,
+    )
+
+    dot = build_dot(project, graph_cfg, renderer_cfg)
+
+    # Expect the aggregated edge foo->bar to show count 2 and lines [2, 3]
+    # Node IDs are fully-qualified (mod.foo -> mod.bar)
+    assert '"mod.foo" -> "mod.bar" [label="2: [2, 3]"]' in dot
