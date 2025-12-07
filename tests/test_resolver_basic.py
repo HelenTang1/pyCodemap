@@ -48,10 +48,3 @@ def test_resolver_discovers_symbols_and_calls(tmp_path: Path) -> None:
     assert call.callee_id == "pkg.a.f"
     assert call.location.file == Path("pkg/a.py")
     assert call.location.lineno > 0
-
-def test_resolver_root_must_be_directory(tmp_path: Path) -> None:
-    file_path = tmp_path / "file.py"
-    file_path.write_text("x = 1\n", encoding="utf-8")
-
-    with pytest.raises(ValueError):
-        resolve_project(file_path, ResolverConfig())

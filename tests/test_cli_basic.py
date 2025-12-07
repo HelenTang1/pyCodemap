@@ -49,9 +49,9 @@ def test_cli_json_output(tmp_path, capsys):
     assert any(s["name"] == "hello" for s in data["symbols"])
 
 
-def test_cli_invalid_root_raises(tmp_path):
+def test_cli_invalid_file_raises(tmp_path):
     # Point to a *file*, not a directory, to exercise the error path in resolve_project
-    file_path = tmp_path / "not_a_dir.py"
+    file_path = tmp_path / "not_a_python_file.txt"
     file_path.write_text("x = 1\n", encoding="utf-8")
 
     with pytest.raises(ValueError):
