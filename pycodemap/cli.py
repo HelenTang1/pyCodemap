@@ -72,7 +72,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-snippet-lines",
         type=int,
-        default=6,
+        default=-1,
         help="Maximum lines of code to include when --label=code (default: 6).",
     )
 
