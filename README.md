@@ -9,15 +9,77 @@ Typical use cases:
 # Dependencies
 - Python == 3.10
 
-# Install(development)
+# Install
+
+## For Users
+From the project directory:
+```bash
+$ pip install .
 ```
+
+## For Development
+```bash
 $ pip install -e .[dev]
 ```
 
-# Run test
+# Usage
+After installation, you can use `pycodemap` from the command line to generate a call graph for your Python project:
+```bash
+$ pycodemap <project_directory> [options]
 ```
+
+## Basic Examples
+
+### Generate a summary (default)
+```bash
+$ pycodemap ./my_project
+```
+
+### Generate an SVG call graph
+```bash
+$ pycodemap ./my_project --format svg -o callgraph.svg
+```
+
+### Generate DOT format
+```bash
+$ pycodemap ./my_project --format dot -o callgraph.dot
+```
+
+## Command-line Options
+
+### Output Format
+- **`--format <format>`**: Output format: `summary` (default, human-readable), `json` (resolver output), `dot` (Graphviz DOT), or `svg` (rendered SVG)
+- **`-o, --output <file>`**: Output file path for DOT/SVG formats (default: `callgraph.dot` or `callgraph.svg`)
+
+### Graph Structure
+- **`--node-type <level>`**: Node granularity: `function` (default) or `file`
+- **`--no-cluster`**: Disable module-based clustering for nodes
+- **`--prune-transitive`**: Remove transitive edges to simplify the call graph
+
+### Node Labels
+- **`--label <style>`**: Node label mode: `name` (default, short name), `qualname` (fully qualified name), or `code` (code snippet)
+- **`--show-module`**: Append module names to node labels
+- **`--show-line-numbers`**: Show line numbers in node labels
+- **`--max-snippet-lines <n>`**: Maximum lines of code when `--label=code` (default: 6)
+
+## Advanced Example
+```bash
+$ pycodemap ./my_project \
+    --format svg \
+    -o graph.svg \
+    --node-type function \
+    --prune-transitive \
+    --label code \
+    --show-module \
+    --show-line-numbers \
+    --max-snippet-lines 10
+```
+
+# Run test
+```bash
 $ python -m pytest -q --cov="pycodemap"  --cov-report=term-missing tests/
 ```
+
 
 # Key Features
 The initial version of the tool is designed around the following requirements: 
