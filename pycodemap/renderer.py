@@ -130,6 +130,9 @@ def _node_label(node: GraphNode, project: ResolvedProject, cfg: RendererConfig) 
 
     # Code snippet label
     if cfg.label_mode == "code" and sym is not None and sym.snippet:
+        # Start with the qualname as a header
+        header = sym.qualname
+        
         lines = sym.snippet.splitlines()
         if cfg.max_snippet_lines > 0:
             lines = lines[: cfg.max_snippet_lines]
@@ -138,7 +141,7 @@ def _node_label(node: GraphNode, project: ResolvedProject, cfg: RendererConfig) 
             start = sym.start_line
             lines = [f"{start + i}: {line}" for i, line in enumerate(lines)]
 
-        label = "\n".join(lines)
+        label = header + "\n" + "\n".join(lines)
         # Graphviz left-justifies lines ending with \l; ensure the final line also aligns
         # by keeping a trailing newline that will become \l after escaping.
         if not label.endswith("\n"):

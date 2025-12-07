@@ -186,6 +186,7 @@ def resolve_project(root: Path, config: Optional[ResolverConfig] = None) -> Reso
             module=module,
             rel_path=rel,
             symbol_index=symbol_index,
+            symbol_index_flat=symbols,
             source_lines=source_lines,
         )
         visitor.visit(tree)
@@ -247,6 +248,8 @@ def _make_module_symbol(module: str, rel_path: Path, source_lines: List[str]) ->
     name = module.split(".")[-1] if module else ""
     start_line = 1
     end_line = len(source_lines) if source_lines else 1
+    # Include snippet for file-level code labels
+    snippet = "".join(source_lines) if source_lines else None
     return Symbol(
         id=module,
         kind="module",
@@ -256,7 +259,7 @@ def _make_module_symbol(module: str, rel_path: Path, source_lines: List[str]) ->
         file=rel_path,
         start_line=start_line,
         end_line=end_line,
-        snippet=None,  # avoid embedding whole file by default
+        snippet=snippet,
     )
 
 
@@ -373,11 +376,13 @@ class _CallVisitor(ast.NodeVisitor):
         module: str,
         rel_path: Path,
         symbol_index: Dict[Tuple[str, str], List[Symbol]],
+        symbol_index_flat: Dict[str, Symbol],
         source_lines: List[str],
-    ) -> None:
+    ):
         self.module = module
         self.rel_path = rel_path
         self.symbol_index = symbol_index
+        self.symbol_index_flat = symbol_index_flat
         self.source_lines = source_lines
 
         self.calls: List[Call] = []
@@ -473,6 +478,21 @@ class _CallVisitor(ast.NodeVisitor):
                 callee_id=callee_id,
             )
         )
+
+        # If the call target is a class, also record a call to its __init__
+        if callee_id is not None:
+            sym = self.symbol_index_flat.get(callee_id)
+            if sym and sym.kind == "class":
+                init_id = f"{callee_id}.__init__"
+                if init_id in self.symbol_index_flat:
+                    self.calls.append(
+                        Call(
+                            caller_id=caller_id,
+                            location=location,
+                            raw_callee=f"{raw}.__init__",
+                            callee_id=init_id,
+                        )
+                    )
 
         self.generic_visit(node)
 
