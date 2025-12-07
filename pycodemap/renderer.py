@@ -139,6 +139,10 @@ def _node_label(node: GraphNode, project: ResolvedProject, cfg: RendererConfig) 
             lines = [f"{start + i}: {line}" for i, line in enumerate(lines)]
 
         label = "\n".join(lines)
+        # Graphviz left-justifies lines ending with \l; ensure the final line also aligns
+        # by keeping a trailing newline that will become \l after escaping.
+        if not label.endswith("\n"):
+            label += "\n"
         return label
 
     # Name / qualname label
