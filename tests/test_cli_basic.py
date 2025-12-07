@@ -75,3 +75,23 @@ def test_cli_dot_output(tmp_path: Path) -> None:
     content = output.read_text(encoding="utf-8")
     assert "digraph CallGraph" in content
     assert "hello" in content
+
+
+def test_cli_svg_writes_output(tmp_path: Path, monkeypatch, capsys) -> None:
+    """Cover cli svg branch without requiring graphviz."""
+    script = tmp_path / "script.py"
+    script.write_text("def hi():\n    return 1\nhi()\n", encoding="utf-8")
+
+    recorded = {}
+
+    def fake_write_svg(dot: str, output: Path) -> None:
+        recorded["dot"] = dot
+        output.write_text(dot, encoding="utf-8")
+
+    monkeypatch.setattr("pycodemap.cli.write_svg", fake_write_svg)
+
+    code = main([str(script), "--format", "svg", "-o", str(tmp_path / "out.svg")])
+    assert code == 0
+    assert (tmp_path / "out.svg").exists()
+    assert "digraph CallGraph" in recorded["dot"]
+

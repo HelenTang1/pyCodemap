@@ -3,7 +3,7 @@ import textwrap
 import pytest
 import os
 from pycodemap import resolve_project, ResolverConfig
-
+from pycodemap.resolver import Symbol, _pick_best_symbol
 
 def test_resolver_discovers_symbols_and_calls(tmp_path: Path) -> None:
     # Arrange: small fake project
@@ -48,3 +48,29 @@ def test_resolver_discovers_symbols_and_calls(tmp_path: Path) -> None:
     assert call.callee_id == "pkg.a.f"
     assert call.location.file == Path("pkg/a.py")
     assert call.location.lineno > 0
+
+def test_pick_best_symbol_prefers_function_over_class() -> None:
+    func = Symbol(
+        id="m.foo",
+        kind="function",
+        name="foo",
+        qualname="m.foo",
+        module="m",
+        file=Path("m.py"),
+        start_line=1,
+        end_line=1,
+        snippet=None,
+    )
+    cls = Symbol(
+        id="m.foo",
+        kind="class",
+        name="foo",
+        qualname="m.foo",
+        module="m",
+        file=Path("m.py"),
+        start_line=1,
+        end_line=1,
+        snippet=None,
+    )
+    best = _pick_best_symbol([cls, func])
+    assert best.kind == "function"

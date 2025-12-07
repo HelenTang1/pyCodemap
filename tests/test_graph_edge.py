@@ -1,11 +1,11 @@
 # tests/test_graph_extra.py
 from pathlib import Path
-from dataclasses import dataclass
 
 import pytest
 
 from pycodemap.resolver import Symbol, ResolverConfig, resolve_project
 import pycodemap.graph as graph
+from pycodemap import GraphConfig, build_call_graph, GraphNode, GraphEdge, CallGraph
 
 
 def _make_symbol(
@@ -190,3 +190,52 @@ def test_edge_labels_include_line_numbers_when_enabled(tmp_path: Path) -> None:
     # Expect the aggregated edge foo->bar to show count 2 and lines [2, 3]
     # Node IDs are fully-qualified (mod.foo -> mod.bar)
     assert '"mod.foo" -> "mod.bar" [label="2: [2, 3]"]' in dot
+
+def test_graph_unsupported_granularity_value_error(tmp_path: Path) -> None:
+    (tmp_path / "m.py").write_text("def f():\n    pass\n", encoding="utf-8")
+    project = resolve_project(tmp_path)
+    cfg = GraphConfig(node_granularity="weird")  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        build_call_graph(project, cfg)
+
+
+def test_graph_file_cluster_top_package(tmp_path: Path) -> None:
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "pkg" / "sub").mkdir(parents=True)
+    (tmp_path / "pkg" / "sub" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+
+    project = resolve_project(tmp_path)
+    cfg = GraphConfig(node_granularity="file", cluster_by_module=True)
+    cg = build_call_graph(project, cfg)
+    node = cg.nodes.get("pkg.sub.mod")
+    assert node is not None
+    # top-level cluster should be "pkg"
+    assert node.cluster == "pkg"
+
+
+def test_graph_skips_edges_with_unresolved_callee(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("def run():\n    print('hi')\nrun()\n", encoding="utf-8")
+    project = resolve_project(tmp_path)
+    cfg = GraphConfig(node_granularity="function")
+    cg = build_call_graph(project, cfg)
+    # print is unresolved -> edge skipped
+    assert cg.edges == {}
+
+
+def test_graph_prune_transitive_branch() -> None:
+    nodes = {
+        "a": GraphNode(id="a", label="a", kind="function"),
+        "b": GraphNode(id="b", label="b", kind="function"),
+        "c": GraphNode(id="c", label="c", kind="function"),
+    }
+    edges = {
+        ("a", "b"): GraphEdge(src="a", dst="b", call_count=1, line_numbers=[1]),
+        ("b", "c"): GraphEdge(src="b", dst="c", call_count=1, line_numbers=[2]),
+        ("a", "c"): GraphEdge(src="a", dst="c", call_count=1, line_numbers=[3]),
+    }
+    cg = CallGraph(nodes=nodes, edges=edges)
+    graph._prune_transitive_edges(cg)
+    remaining = set(cg.edges.keys())
+    assert ("a", "c") not in remaining
+    assert ("a", "b") in remaining and ("b", "c") in remaining
