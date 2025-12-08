@@ -90,11 +90,23 @@ class GraphConfig:
     prune_transitive:
         If True, run a simple transitive-reduction pass to remove edges (u, v)
         whenever there exists an alternate path from u to v.
+    filter_keywords:
+        List of keywords to filter nodes. A node is kept if its name/qualname contains
+        any of the keywords. If empty, no filtering is applied.
+    link_by_filter:
+        If True and filter_keywords is not empty, also keep nodes that are called by
+        filtered nodes (transitively). Has no effect if filter_keywords is empty.
     """
 
     node_granularity: NodeGranularity = "function"
     cluster_by_module: bool = True
     prune_transitive: bool = False
+    filter_keywords: List[str] = None
+    link_by_filter: bool = False
+
+    def __post_init__(self):
+        if self.filter_keywords is None:
+            self.filter_keywords = []
 
 
 def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = None) -> CallGraph:
@@ -207,6 +219,12 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
     # ------------------------------------------------------------------
     if config.prune_transitive:
         _prune_transitive_edges(graph)
+
+    # ------------------------------------------------------------------
+    # Step 4: optional filtering
+    # ------------------------------------------------------------------
+    if config.filter_keywords:
+        _apply_filter(graph, config.filter_keywords, config.link_by_filter)
 
     return graph
 
@@ -324,3 +342,71 @@ def _has_alternate_path(
                 queue.append(w)
 
     return False
+
+
+def _apply_filter(graph: CallGraph, keywords: List[str], link_by_filter: bool) -> None:
+    """
+    Filter the graph to keep only nodes matching the keywords.
+    
+    A node matches if any keyword appears in its label or node ID (qualname).
+    
+    If link_by_filter is True, also keep all nodes that are transitively called
+    by the matched nodes.
+    
+    Modifies the graph in place by removing nodes and edges.
+    """
+    if not keywords:
+        return
+    
+    # Find nodes that match any keyword
+    matched_nodes: Set[str] = set()
+    for node_id, node in graph.nodes.items():
+        # Check if any keyword is contained in the node label or ID
+        for keyword in keywords:
+            if keyword in node.label or keyword in node_id:
+                matched_nodes.add(node_id)
+                break
+    
+    # If no matches, keep no nodes
+    if not matched_nodes:
+        graph.nodes.clear()
+        graph.edges.clear()
+        return
+    
+    # Determine final set of nodes to keep
+    nodes_to_keep = set(matched_nodes)
+    
+    if link_by_filter:
+        # Build adjacency list from edges
+        adj: Dict[str, Set[str]] = {}
+        for edge in graph.edges.values():
+            adj.setdefault(edge.src, set()).add(edge.dst)
+        
+        # For each matched node, find all reachable nodes (callees)
+        from collections import deque
+        for start_node in matched_nodes:
+            visited: Set[str] = set()
+            queue: deque[str] = deque([start_node])
+            visited.add(start_node)
+            
+            while queue:
+                node = queue.popleft()
+                for neighbor in adj.get(node, set()):
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        nodes_to_keep.add(neighbor)
+                        queue.append(neighbor)
+    
+    # Remove nodes not in the keep set
+    nodes_to_remove = set(graph.nodes.keys()) - nodes_to_keep
+    for node_id in nodes_to_remove:
+        graph.nodes.pop(node_id, None)
+    
+    # Remove edges that reference removed nodes
+    edges_to_remove = []
+    for key, edge in graph.edges.items():
+        if edge.src not in nodes_to_keep or edge.dst not in nodes_to_keep:
+            edges_to_remove.append(key)
+    
+    for key in edges_to_remove:
+        graph.edges.pop(key, None)

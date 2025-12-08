@@ -76,6 +76,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Maximum lines of code to include when --label=code (default: 6).",
     )
 
+    # Filtering options
+    parser.add_argument(
+        "--filter",
+        type=str,
+        help="Comma-separated keywords to filter nodes. Keeps nodes whose names contain any keyword.",
+    )
+    parser.add_argument(
+        "--link-by-filter",
+        action="store_true",
+        help="When --filter is used, also keep nodes called by filtered nodes (has no effect without --filter).",
+    )
+
     # Output file for DOT/SVG
     parser.add_argument(
         "-o",
@@ -94,12 +106,25 @@ def main(argv: Any | None = None) -> int:
     root = Path(args.root)
     project = resolve_project(root, config=ResolverConfig())
 
+    # Parse filter keywords for all formats
+    filter_keywords = []
+    if args.filter is not None:
+        filter_keywords = [kw.strip() for kw in args.filter.split(",") if kw.strip()]
+        # If filter was provided but resulted in no keywords (e.g., empty string or whitespace only),
+        # treat it as wanting to filter everything out (match nothing)
+        if not filter_keywords and args.filter is not None:
+            filter_keywords = ["__MATCH_NOTHING__"]
+
     # Simple modes do not need graph/renderer
     if args.format == "summary":
+        if filter_keywords:
+            project = _filter_project(project, filter_keywords, args.link_by_filter)
         _print_summary(project)
         return 0
 
     if args.format == "json":
+        if filter_keywords:
+            project = _filter_project(project, filter_keywords, args.link_by_filter)
         data = _resolved_project_to_jsonable(project)
         print(json.dumps(data, indent=2, ensure_ascii=False))
         return 0
@@ -109,6 +134,8 @@ def main(argv: Any | None = None) -> int:
         node_granularity=args.node_type,
         cluster_by_module=not args.no_cluster,
         prune_transitive=args.prune_transitive,
+        filter_keywords=filter_keywords,
+        link_by_filter=args.link_by_filter,
     )
     renderer_cfg = RendererConfig(
         label_mode=args.label,
@@ -160,6 +187,57 @@ def _resolved_project_to_jsonable(project) -> Dict[str, Any]:
             for c in project.calls
         ],
     }
+
+
+def _filter_project(project, filter_keywords, link_by_filter):
+    """
+    Filter a ResolvedProject based on keywords.
+    
+    Returns a new ResolvedProject with filtered symbols and calls.
+    """
+    from .graph import GraphConfig, build_call_graph
+    
+    # Build a graph with filtering enabled
+    graph_cfg = GraphConfig(
+        node_granularity="function",
+        filter_keywords=filter_keywords,
+        link_by_filter=link_by_filter,
+    )
+    graph = build_call_graph(project, graph_cfg)
+    
+    # Extract kept symbol IDs from the graph
+    kept_symbol_ids = set()
+    for node in graph.nodes.values():
+        if node.symbol_id:
+            kept_symbol_ids.add(node.symbol_id)
+    
+    # Also keep module symbols for kept functions
+    kept_modules = set()
+    for sym_id in kept_symbol_ids:
+        sym = project.symbols.get(sym_id)
+        if sym:
+            kept_modules.add(sym.module)
+    
+    # Filter symbols
+    filtered_symbols = {}
+    for sym_id, sym in project.symbols.items():
+        if sym_id in kept_symbol_ids or (sym.kind == "module" and sym.id in kept_modules):
+            filtered_symbols[sym_id] = sym
+    
+    # Filter calls to only include calls between kept symbols
+    filtered_calls = []
+    for call in project.calls:
+        if call.caller_id in kept_symbol_ids:
+            if call.callee_id is None or call.callee_id in kept_symbol_ids:
+                filtered_calls.append(call)
+    
+    # Create new ResolvedProject with filtered data
+    from .resolver import ResolvedProject
+    return ResolvedProject(
+        root=project.root,
+        symbols=filtered_symbols,
+        calls=filtered_calls,
+    )
 
 
 def _print_summary(project) -> None:
