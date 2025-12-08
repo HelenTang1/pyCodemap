@@ -17,7 +17,7 @@ __all__ = [
     "resolve_project",
 ]
 
-SymbolKind = Literal["function", "method", "class", "module", "file"]
+SymbolKind = Literal["function", "method", "class", "module", "file", "attribute"]
 
 
 
@@ -279,6 +279,8 @@ class _SymbolVisitor(ast.NodeVisitor):
         self.source_lines = source_lines
         self.symbols: List[Symbol] = []
         self._qualname_stack: List[str] = []
+        self._class_attributes: Dict[str, List[Tuple[str, int, int]]] = {}  # class_qualname -> [(attr_name, lineno, end_lineno)]
+        self._in_function_depth: int = 0  # Track if we're inside a function/method
 
     # --- helpers ---------------------------------------------------------
 
@@ -326,14 +328,18 @@ class _SymbolVisitor(ast.NodeVisitor):
         kind: SymbolKind = "function" if not self._qualname_stack else "method"
         self._add_symbol(node, kind=kind, name=node.name)
         self._push(node.name)
+        self._in_function_depth += 1
         self.generic_visit(node)
+        self._in_function_depth -= 1
         self._pop()
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         kind: SymbolKind = "function" if not self._qualname_stack else "method"
         self._add_symbol(node, kind=kind, name=node.name)
         self._push(node.name)
+        self._in_function_depth += 1
         self.generic_visit(node)
+        self._in_function_depth -= 1
         self._pop()
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -341,6 +347,19 @@ class _SymbolVisitor(ast.NodeVisitor):
         self._push(node.name)
         self.generic_visit(node)
         self._pop()
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """Track annotated assignments (class attributes with type hints)."""
+        # Only track if we're directly inside a class (not in a method/function)
+        if self._qualname_stack and self._in_function_depth == 0 and isinstance(node.target, ast.Name):
+            class_qualname = ".".join([self.module, *self._qualname_stack])
+            attr_name = node.target.id
+            lineno = getattr(node, "lineno", 1)
+            end_lineno = getattr(node, "end_lineno", lineno)
+            if class_qualname not in self._class_attributes:
+                self._class_attributes[class_qualname] = []
+            self._class_attributes[class_qualname].append((attr_name, lineno, end_lineno))
+        self.generic_visit(node)
 
 
 def _iter_symbols_from_ast(
@@ -355,6 +374,34 @@ def _iter_symbols_from_ast(
         source_lines=source_lines,
     )
     visitor.visit(tree)
+    
+    # Create a single attributes node for each class that has attributes
+    for class_qualname, attrs in visitor._class_attributes.items():
+        if not attrs:
+            continue
+        # Sort by line number
+        attrs.sort(key=lambda x: x[1])
+        # Get the range of lines containing all attributes
+        start_line = attrs[0][1]
+        end_line = attrs[-1][2]
+        # Extract snippet containing all attributes
+        snippet = "".join(source_lines[start_line - 1 : end_line])
+        # Create a single symbol for all attributes of this class
+        attr_names = ", ".join(attr[0] for attr in attrs)
+        visitor.symbols.append(
+            Symbol(
+                id=f"{class_qualname}.<attributes>",
+                kind="attribute",
+                name=f"<attributes>",
+                qualname=f"{class_qualname}.<attributes>",
+                module=module,
+                file=rel_path,
+                start_line=start_line,
+                end_line=end_line,
+                snippet=snippet,
+            )
+        )
+    
     return visitor.symbols
 
 
@@ -553,7 +600,7 @@ def _build_symbol_index(symbols: Dict[str, Symbol]) -> Dict[Tuple[str, str], Lis
     """
     index: DefaultDict[Tuple[str, str], List[Symbol]] = defaultdict(list)
     for sym in symbols.values():
-        if sym.kind not in ("function", "method", "class"):
+        if sym.kind not in ("function", "method", "class", "attribute"):
             continue
         index[(sym.module, sym.name)].append(sym)
     return dict(index)

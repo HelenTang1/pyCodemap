@@ -8,7 +8,7 @@ from .resolver import ResolvedProject, Symbol
 
 
 NodeGranularity = Literal["function", "file"]
-NodeKind = Literal["function", "file"]
+NodeKind = Literal["function", "file", "attribute"]
 
 
 @dataclass
@@ -114,7 +114,7 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
 
     if config.node_granularity == "function":
         for sym in project.symbols.values():
-            if sym.kind not in ("function", "method"):
+            if sym.kind not in ("function", "method", "attribute"):
                 continue
             node_id = sym.id
             label = sym.name
@@ -122,7 +122,7 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
             # Cluster functions: if cluster_by_module is True, group methods by their
             # containing class (parent qualname), or by module for top-level functions.
             if config.cluster_by_module:
-                if sym.kind == "method" and "." in sym.qualname:
+                if sym.kind in ("method", "attribute") and "." in sym.qualname:
                     # Extract the class qualname (everything before the last dot)
                     cluster = sym.qualname.rsplit(".", 1)[0]
                 else:
@@ -133,7 +133,7 @@ def build_call_graph(project: ResolvedProject, config: Optional[GraphConfig] = N
             nodes[node_id] = GraphNode(
                 id=node_id,
                 label=label,
-                kind="function",
+                kind=sym.kind,
                 module= sym.module,
                 file=sym.file,
                 symbol_id=sym.id,

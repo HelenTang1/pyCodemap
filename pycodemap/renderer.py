@@ -101,6 +101,7 @@ def build_dot(
 
         for node in sorted(nodes, key=lambda n: n.id):
             label_result = _node_label(node, project, renderer_config)
+            
             if isinstance(label_result, tuple):  # HTML label
                 html_label, _ = label_result
                 lines.append(
