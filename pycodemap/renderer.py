@@ -42,6 +42,25 @@ class RendererConfig:
     max_snippet_lines: int = 6
 
 
+def _escape_label(text: str) -> str:
+    """
+    Escape a label string for use in DOT.
+
+    - backslashes and quotes are escaped
+    - newlines become `\\l` (Graphviz left-justified line break)
+    """
+    text = text.replace("\\", "\\\\").replace('"', '\\"')
+    text = text.replace("\n", "\\l")
+    return text
+
+def _sanitize_id(s: str) -> str:
+    """
+    Sanitize an identifier for use in DOT.
+
+    Since we always quote IDs, this only needs to escape quotes.
+    """
+    return s.replace('"', '\\"')
+
 def build_dot(
     project: ResolvedProject,
     graph_config: GraphConfig,
@@ -53,6 +72,7 @@ def build_dot(
     This is a pure function: it does not touch the filesystem or run Graphviz.
     """
     call_graph: CallGraph = build_call_graph(project, graph_config)
+
 
     lines: List[str] = []
     lines.append("digraph CallGraph {")
@@ -94,7 +114,9 @@ def build_dot(
         if cluster_id is not None:
             lines.append("  }")
 
-    # Edges
+
+
+    # Edges (original call graph)
     for edge in sorted(call_graph.iter_edges(), key=lambda e: (e.src, e.dst)):
         src = _sanitize_id(edge.src)
         dst = _sanitize_id(edge.dst)
@@ -115,7 +137,6 @@ def build_dot(
 
     lines.append("}")
     return "\n".join(lines)
-
 
 def _build_html_label(header: str, code: str, start_line: Optional[int] = None) -> str:
     """

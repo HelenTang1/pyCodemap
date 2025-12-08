@@ -1,5 +1,5 @@
-from pycodemap.resolver import resolve_project
-from pycodemap.graph import GraphConfig, GraphNode, GraphEdge, CallGraph, build_call_graph
+from pycodemap.resolver import resolve_project, ResolvedProject
+from pycodemap.graph import GraphConfig, GraphNode, GraphEdge, CallGraph
 from pycodemap.renderer import RendererConfig, build_dot
 from pathlib import Path
 
@@ -18,12 +18,13 @@ def test_renderer_label_when_symbol_missing(monkeypatch) -> None:
     # Build a tiny call graph with a node lacking symbol_id to hit sym None path.
     node = GraphNode(id="n1", label="orphan", kind="function", module="mod")
     cg = CallGraph(nodes={"n1": node}, edges={})
+    project = ResolvedProject(root=Path("."), symbols={}, calls=[])
 
     def fake_build_call_graph(project, cfg):  # pragma: no cover - monkeypatched use
         return cg
 
     monkeypatch.setattr("pycodemap.renderer.build_call_graph", fake_build_call_graph)
-    dot = build_dot(project=None, graph_config=GraphConfig(), renderer_config=RendererConfig(show_module=True))
+    dot = build_dot(project=project, graph_config=GraphConfig(), renderer_config=RendererConfig(show_module=True))
     assert "orphan" in dot
 
 
@@ -34,10 +35,11 @@ def test_renderer_edge_label_no_line_numbers(monkeypatch) -> None:
     }
     edge = GraphEdge(src="n1", dst="n2", call_count=3, line_numbers=[])
     cg = CallGraph(nodes=nodes, edges={("n1", "n2"): edge})
+    project = ResolvedProject(root=Path("."), symbols={}, calls=[])
 
     def fake_build_call_graph(project, cfg):  # pragma: no cover
         return cg
 
     monkeypatch.setattr("pycodemap.renderer.build_call_graph", fake_build_call_graph)
-    dot = build_dot(project=None, graph_config=GraphConfig(), renderer_config=RendererConfig(show_line_numbers=True))
+    dot = build_dot(project=project, graph_config=GraphConfig(), renderer_config=RendererConfig(show_line_numbers=True))
     assert 'label="3"' in dot

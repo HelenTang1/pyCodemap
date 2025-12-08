@@ -20,6 +20,7 @@ __all__ = [
 SymbolKind = Literal["function", "method", "class", "module", "file"]
 
 
+
 @dataclass(frozen=True)
 class SourceLocation:
     """
@@ -360,6 +361,54 @@ def _iter_symbols_from_ast(
 # ---------------------------------------------------------------------------
 # Call discovery
 # ---------------------------------------------------------------------------
+
+
+def callsite_nodes(project: 'ResolvedProject') -> Dict[str, Dict]:
+    """
+    Return a dict of callsite node info for each call in the project.
+    Key is a unique node id, value is a dict with file, lineno, col_offset, and callee_id.
+    """
+    nodes = {}
+    for i, call in enumerate(project.calls):
+        loc = call.location
+        node_id = f"callsite:{loc.file}:{loc.lineno}:{loc.col_offset}:{i}"
+        nodes[node_id] = {
+            "file": str(loc.file),
+            "lineno": loc.lineno,
+            "col_offset": loc.col_offset,
+            "callee_id": call.callee_id,
+            "raw_callee": call.raw_callee,
+        }
+    return nodes
+
+def callsite_graph(project: 'ResolvedProject') -> Dict[str, List[tuple]]:
+    """
+    Return a dict with 'nodes' and 'edges' for a callsite-augmented call graph.
+    Each callsite is a node (id: callsite:<file>:<lineno>:<col_offset>:<i>),
+    with edges: caller_id -> callsite_id -> callee_id (if callee_id exists).
+    """
+    nodes = {}
+    edges = []
+    for i, call in enumerate(project.calls):
+        loc = call.location
+        callsite_id = f"callsite:{loc.file}:{loc.lineno}:{loc.col_offset}:{i}"
+        # Node label includes file, line, col
+        label = f"{loc.file}:{loc.lineno}:{loc.col_offset}"
+        nodes[callsite_id] = {
+            "label": label,
+            "file": str(loc.file),
+            "lineno": loc.lineno,
+            "col_offset": loc.col_offset,
+            "raw_callee": call.raw_callee,
+            "callee_id": call.callee_id,
+            "caller_id": call.caller_id,
+        }
+        # Edge: caller -> callsite
+        edges.append((call.caller_id, callsite_id))
+        # Edge: callsite -> callee (if resolved)
+        if call.callee_id:
+            edges.append((callsite_id, call.callee_id))
+    return {"nodes": nodes, "edges": edges}
 
 class _CallVisitor(ast.NodeVisitor):
     """
