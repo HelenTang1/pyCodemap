@@ -261,8 +261,7 @@ def test_filter_with_svg_output(tmp_path: Path, monkeypatch) -> None:
     def mock_write_svg(dot: str, output: Path) -> None:
         output.write_text(f"<svg>{dot}</svg>", encoding="utf-8")
     
-    import pycodemap.renderer
-    monkeypatch.setattr(pycodemap.renderer, "write_svg", mock_write_svg)
+    monkeypatch.setattr("pycodemap.cli.write_svg", mock_write_svg)
     
     (tmp_path / "mod.py").write_text(
         textwrap.dedent(
