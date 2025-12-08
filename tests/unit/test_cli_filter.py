@@ -258,8 +258,8 @@ def test_filter_with_dot_output(tmp_path: Path) -> None:
 def test_filter_with_svg_output(tmp_path: Path, monkeypatch) -> None:
     """Test --filter works with SVG format output."""
     # Mock Graphviz to avoid dependency in tests
-    def mock_write_svg(dot_content: str, output_path: Path) -> None:
-        output_path.write_text(f"<svg>{dot_content}</svg>", encoding="utf-8")
+    def mock_write_svg(dot: str, output: Path) -> None:
+        output.write_text(f"<svg>{dot}</svg>", encoding="utf-8")
     
     import pycodemap.renderer
     monkeypatch.setattr(pycodemap.renderer, "write_svg", mock_write_svg)
