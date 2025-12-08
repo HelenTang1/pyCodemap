@@ -56,6 +56,10 @@ $ pycodemap ./my_project --format dot -o callgraph.dot
 - **`--no-cluster`**: Disable module-based clustering for nodes
 - **`--prune-transitive`**: Remove transitive edges to simplify the call graph
 
+### Filtering
+- **`--filter <k1,k2,...>`**: Keep only nodes whose names contain any of the comma-separated keywords (applies to all formats).
+- **`--link-by-filter`**: When used with `--filter`, also keep nodes that are called by filtered nodes (transitively). No effect without `--filter`.
+
 ### Node Labels
 - **`--label <style>`**: Node label mode: `name` (default, short name), `qualname` (fully qualified name), or `code` (code snippet)
 - **`--show-module`**: Append module names to node labels
@@ -72,7 +76,8 @@ $ pycodemap ./my_project \
     --label code \
     --show-module \
     --show-line-numbers \
-    --max-snippet-lines 10
+    --filter process,calculate \
+    --link-by-filter
 ```
 
 # Run test
@@ -94,6 +99,8 @@ The initial version of the tool is designed around the following requirements:
   - When using function-level nodes, optionally group nodes by **module**, so that logical boundaries are clearer.
 - **Transitive edge reduction**
   - Optionally remove **redundant transitive edges** to make the graph more readable.
+- **Keyword-based filtering**
+  - Focus on only the symbols that matter by keeping nodes whose names match provided keywords and, when desired, their transitive callees (`--filter`, `--link-by-filter`).
 - **Flexible node labels**
   - Nodes can display either:
     - The **definition name** (for high-level architecture overview), or  
