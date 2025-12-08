@@ -34,13 +34,11 @@ def test_code_label_shows_qualname_header(tmp_path: Path) -> None:
     
     # The label should contain the qualname "mod.foo" followed by the code
     assert "mod.foo" in dot
-    assert "return 42" in dot
+    # Code content may be wrapped in FONT tags for syntax highlighting
+    assert "return" in dot and "42" in dot
     
-    # Verify the qualname appears before the code in the label
-    # (The exact format depends on escaping, but qualname should be present)
-    lines = dot.split("\\l")
-    # First line after opening quote should contain qualname
-    assert any("mod.foo" in line for line in lines[:3])
+    # Verify HTML table structure for code labels
+    assert "<TABLE" in dot and "</TABLE>" in dot
 
 
 def test_code_label_with_line_numbers_shows_qualname(tmp_path: Path) -> None:
