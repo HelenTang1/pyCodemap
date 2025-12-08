@@ -8,6 +8,7 @@ Typical use cases:
 
 # Dependencies
 - Python == 3.10
+- Graphviz system binaries (for DOT/SVG output)
 
 # Install
 
@@ -16,6 +17,13 @@ From the project directory:
 ```bash
 $ pip install .
 ```
+
+Install Graphviz system binaries (required for DOT/SVG rendering) and ensure `dot` is on your PATH:
+- Windows: `choco install graphviz`
+- macOS: `brew install graphviz`
+- Debian/Ubuntu: `sudo apt-get install graphviz`
+- Arch: `sudo pacman -S graphviz`
+Download installers and other options: https://graphviz.org/download/
 
 ## For Development
 ```bash
